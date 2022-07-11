@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="nonebot_plugin_bVideo",
-    version="1.0.2",
+    version="1.1.0",
     author="wziru",
     description="A NoneBot2-based plugin for processing plugins that push the latest videos of the B station up master.",
     long_description=long_description,
