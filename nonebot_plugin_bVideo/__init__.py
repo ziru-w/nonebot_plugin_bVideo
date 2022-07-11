@@ -1,3 +1,4 @@
+
 import requests
 import json
 from os.path import dirname,exists
@@ -103,21 +104,18 @@ async def _(bot: Bot, event: MessageEvent):
         await addBPush.finish('推送目录暂无此up，请先添加，命令/添加B站UP 名字')
     sendDict=bVideoPushInfo["sendDict"]
     if isinstance(event,PrivateMessageEvent):
-        if event.user_id not in sendDict[mid]['qq']:
-            if op=='添加':
-                sendDict[mid]['qq'].append(event.user_id)
-        else:
-            if op=='删除':
-                sendDict[mid]['qq'].remove(event.user_id)
+        id=event.user_id
+        sendList=sendDict[mid]['qq']
         # name=sendDict[mid]['videoUp']
     if isinstance(event,GroupMessageEvent):
-        if event.user_id not in sendDict[mid]['qq']:
-            if op=='添加':
-                sendDict[mid]['group'].append(event.group_id)
-        else:
-            if op=='删除':
-                sendDict[mid]['group'].remove(event.user_id)
-        
+        id=event.group_id
+        sendList=sendDict[mid]['group']
+    if id not in sendList:
+        if op=='添加':
+            sendList.append(id)
+    else:
+        if op=='删除':
+            sendList.remove(id)
     with open(bVideo_dir +'/bVideoPushInfo.json','w',encoding='utf-8') as fp:
         json.dump(bVideoPushInfo,fp,ensure_ascii=False)
     await addBPush.send('{}已{}成功'.format(sendDict[mid]['videoUp'],op))
