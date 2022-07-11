@@ -49,7 +49,7 @@ addBUp = on_command("收录B站UP",aliases={'收录b站up'})
 async def _(bot: Bot, event: MessageEvent):
     with open(bVideo_dir +'/bVideoPushInfo.json','r',encoding='utf-8') as fp:
         bVideoPushInfo=json.loads(fp.read())
-    text=event.get_plaintext()
+    text=event.get_plaintext().strip()
     mid=text[7:].strip().replace('https://space.bilibili.com/','')
     if not mid.isdigit():
         await addBPush.finish('请不要在链接后面加东西或啥也没，形如https://space.bilibili.com/688379639,不需要?以后的东西')
@@ -89,7 +89,7 @@ addBPush = on_command("添加B站推送",aliases={'删除B站推送'})
 async def _(bot: Bot, event: MessageEvent):
     with open(bVideo_dir +'/bVideoPushInfo.json','r',encoding='utf-8') as fp:
         bVideoPushInfo=json.loads(fp.read())
-    text=event.get_plaintext()
+    text=event.get_plaintext().strip()
     op=text[1:3]
     text=text[7:].strip()
     if text=='':
@@ -156,4 +156,3 @@ async def sendBVideo(op=0,bot: Bot='', event: MessageEvent=''):
     if op!=0:
         with open(bVideo_dir +'/oldMessage.json','w',encoding='utf-8') as fp:
             json.dump(oldMessage,fp,ensure_ascii=False)
-
