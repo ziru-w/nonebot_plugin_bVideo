@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="nonebot_plugin_bVideo",
-    version="1.0.0",
+    version="1.1.0",
     author="wziru",
     description="A NoneBot2-based plugin for processing plugins that push the latest videos of the B station up master.",
     long_description=long_description,
@@ -22,7 +22,9 @@ setup(
     packages=["nonebot_plugin_bVideo"],
     python_requires=">=3.7",
     install_requires = [
-        'nonebot2>=2.0.0b1',
-        'apscheduler>=3.8.1'
+        'nonebot-adapter-onebot>=2.0.0-beta.1',
+        'nonebot2>=2.0.0-beta.1',
+        'requests',
+        'nonebot_plugin_apscheduler'
     ]
 )

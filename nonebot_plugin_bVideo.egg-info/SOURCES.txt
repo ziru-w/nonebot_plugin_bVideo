@@ -1,0 +1,9 @@
+LICENSE
+README.md
+setup.py
+nonebot_plugin_bVideo/__init__.py
+nonebot_plugin_bVideo.egg-info/PKG-INFO
+nonebot_plugin_bVideo.egg-info/SOURCES.txt
+nonebot_plugin_bVideo.egg-info/dependency_links.txt
+nonebot_plugin_bVideo.egg-info/requires.txt
+nonebot_plugin_bVideo.egg-info/top_level.txt
