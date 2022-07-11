@@ -43,11 +43,6 @@ async def send_bVideo_everyday():
 for time in bVideoSendTime:
     logger.info("time:{}".format(time))
     scheduler.add_job(send_bVideo_everyday, "cron", hour=time['hour'], minute=time['minute'])
-    # with open(bVideo_dir +'/bVideoPushInfo.json','r',encoding='utf-8') as fp:
-    #     bVideoPushInfo=json.loads(fp.read())
-    # bVideoSendTime=bVideoPushInfo["bVideoSendTime"]
-    # with open(bVideo_dir+'/1.txt','w',encoding='utf-8') as fp:
-    #    json.dump('1',fp,ensure_ascii=False)
 
 addBUp = on_command("收录B站UP",aliases={'收录b站up'})
 @addBUp.handle()
