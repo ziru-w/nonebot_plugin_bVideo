@@ -1,14 +1,13 @@
 
 import re
 import aiohttp
-import json
 from nonebot.adapters.onebot.v11 import Bot,MessageEvent, GroupMessageEvent,PrivateMessageEvent,MessageSegment
 from nonebot import  on_command,logger,get_bot
 from nonebot.params import Arg, CommandArg, ArgPlainText
 from nonebot.adapters import Message
 from nonebot.permission import SUPERUSER
 from nonebot.adapters.onebot.v11.permission import GROUP_ADMIN, GROUP_OWNER
-from .utils import sendBVideo,buildMessage,findMid,getUpSendMsg,getExist,parseMsg,register,writeFile
+from .utils import sendBVideo,buildMessage,findMid,getUpSendMsg,getExist,register,writeFile
 from .config import bVideoPushInfoPath,bVideoSendTime,scheduler,headers,oldMessage,bVideoPushInfo,schedulerInfo,schedulerInfoPath
 
 
@@ -119,6 +118,7 @@ async def _(bot: Bot, event: GroupMessageEvent,args: Message = CommandArg()):
     id=event.group_id
     pushType='group'
     if '定时' in argsText:
+        id=str(id)
         uid=argsText.replace('定时','').strip()
         sendInfo=schedulerInfo[pushType].get(id)
         if sendInfo!=None:

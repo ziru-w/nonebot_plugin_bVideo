@@ -47,7 +47,7 @@ async def sendBVideo(op=0,bot: Bot='', event: MessageEvent=''):
 
 
 
-async def buildMessage(sendDict:dict,mid):
+async def buildMessage(sendDict:dict,mid,op=0):
     url='https://api.bilibili.com/x/space/arc/search?mid={}'.format(mid)
     async with aiohttp.ClientSession() as session:
         async with session.get(url,headers=headers) as res:
@@ -55,6 +55,8 @@ async def buildMessage(sendDict:dict,mid):
     message=message["data"]["list"][ "vlist"][0]   
     # await easyCommand.send(MessageSegment.share(message["bvid"],sendDict['videoUp']+':'+message["title"],message['description'],message['pic']))
     message='UP主:{}\n标题:{}\n链接:\nhttps://www.bilibili.com/video/{}'.format(sendDict['videoUp'],message["title"],message["bvid"])
+    if op==1:
+        message=MessageSegment.share(message["bvid"],sendDict['videoUp']+':'+message["title"],message['description'],message['pic'])
     return message
 
 def findMid(name,videoUp:dict):
@@ -87,15 +89,6 @@ def getExist(plainCommandtext:str,wholeMessageText:str,argsText:str):
     else:
         return plainCommandtext in commandText
 
-
-async def parseMsg(commandText,resMsg,font_size = 32,isText=1):
-    if len(resMsg)<=300 and isText==1:
-       return resMsg
-    else:
-        title = commandText
-        img = Txt2Img(font_size)
-        pic = img.save(title, resMsg)
-        return MessageSegment.image(pic)
 
 
 
