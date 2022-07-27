@@ -13,3 +13,5 @@ A NoneBot2-based plugin for processing plugins that push the latest videos of th
 /推送b站 返回收录的前6个up的视频标题加链接
 
 /添加B站推送 up主名字 /删除B站推送 up主名字 群聊发推送到该群，私聊推送到发送者 名字允许不一样，但只返回第一个包含结果，所以请尽量一样
+
+已更新功能明晚写

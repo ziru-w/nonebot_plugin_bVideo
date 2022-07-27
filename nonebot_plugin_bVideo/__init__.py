@@ -1,60 +1,33 @@
 
-import requests
+import re
+import aiohttp
 import json
-from os.path import dirname,exists
-from os import mkdir
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-import nonebot_plugin_apscheduler
-from nonebot.adapters.onebot.v11 import Bot,MessageEvent, GroupMessageEvent,PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import Bot,MessageEvent, GroupMessageEvent,PrivateMessageEvent,MessageSegment
 from nonebot import  on_command,logger,get_bot
+from nonebot.params import Arg, CommandArg, ArgPlainText
+from nonebot.adapters import Message
+from nonebot.permission import SUPERUSER
+from nonebot.adapters.onebot.v11.permission import GROUP_ADMIN, GROUP_OWNER
+from .utils import sendBVideo,buildMessage,findMid,getUpSendMsg,getExist,parseMsg,register,writeFile
+from .config import bVideoPushInfoPath,bVideoSendTime,scheduler,headers,oldMessage,bVideoPushInfo,schedulerInfo,schedulerInfoPath
 
-
-bVideo_dir = dirname(__file__) + "/bVideoConfig"
-
-scheduler = nonebot_plugin_apscheduler.scheduler  # type:AsyncIOScheduler
-headers={
-    "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36",
-    "referer":"https://www.bilibili.com/"
-}
-if not exists(bVideo_dir):
-   mkdir(bVideo_dir)
-if not exists(bVideo_dir+'/bVideoPushInfo.json'):
-    bVideoPushInfo={
-        "maxCount":6,
-        "bVideoSendTime":[{"hour":8,"minute":2}],
-        "videoUp": {},
-        "sendDict": {}
-    }
-    with open(bVideo_dir+'/bVideoPushInfo.json','w',encoding='utf-8') as fp:
-       json.dump(bVideoPushInfo,fp,ensure_ascii=False)
-oldMessage={}
-with open(bVideo_dir+'/bVideoPushInfo.json','r',encoding='utf-8') as fp:
-    bVideoPushInfo=json.loads(fp.read())
-# with open(bVideo_dir +'/oldMessage.json','r',encoding='utf-8') as fp:
-#     oldMessage=json.loads(fp.read())
-bVideoSendTime=bVideoPushInfo["bVideoSendTime"]
-logger.info('载入bVideoSendTime：{}'.format(bVideoSendTime))
-
-
-async def send_bVideo_everyday():
-    await sendBVideo(op=1)
-
-
-# 根据配置的参数，注册定时任务,每天发送
-for time in bVideoSendTime:
-    logger.info("time:{}".format(time))
-    scheduler.add_job(send_bVideo_everyday, "cron", hour=time['hour'], minute=time['minute'])
 
 addBUp = on_command("收录B站UP",aliases={'收录b站up'})
 @addBUp.handle()
-async def _(bot: Bot, event: MessageEvent):
-    with open(bVideo_dir +'/bVideoPushInfo.json','r',encoding='utf-8') as fp:
-        bVideoPushInfo=json.loads(fp.read())
-    text=event.get_plaintext().strip()
-    mid=text[7:].strip().replace('https://space.bilibili.com/','')
-    if not mid.isdigit():
-        await addBPush.finish('请不要在链接后面加东西或啥也没，形如https://space.bilibili.com/688379639,不需要?以后的东西')
-    upInfo=requests.get('https://api.bilibili.com/x/space/acc/info?mid={}&jsonp=jsonp'.format(mid),headers=headers).json()
+async def _(bot: Bot, event: MessageEvent,args: Message = CommandArg()):
+    text=str(args).replace('https://space.bilibili.com/','').strip()
+    # midLenght=text.find('?')
+    # if midLenght==-1:
+    #     mid=text
+    mid=re.findall('(\d.+)?[?]|\d.+',text)
+    print(mid)
+    if len(mid)==0:
+        await addBUp.finish('形如https://space.bilibili.com/688379639')
+    mid=mid[0]
+    url='https://api.bilibili.com/x/space/acc/info?mid={}&jsonp=jsonp'.format(mid)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url,headers=headers) as res:
+            upInfo=await res.json()
     try:
         name=upInfo["data"]["name"]
     except Exception as res:
@@ -70,87 +43,178 @@ async def _(bot: Bot, event: MessageEvent):
     bVideoPushInfo["videoUp"][name]=mid
     if bVideoPushInfo["sendDict"].get(mid)!=None:
         bVideoPushInfo["sendDict"][mid]["videoUp"]=name
-        await addBPush.send('推送目录已收录up数据，无需再添加，请直接添加推送')
+        await addBPush.send('推送目录已收录up{}数据，无需再添加，请直接添加推送'.format(name))
     else:
         bVideoPushInfo["sendDict"][mid]={"qq":[],"group":[],"videoUp":name}
-        await addBUp.send('执行成功')
-    with open(bVideo_dir +'/bVideoPushInfo.json','w',encoding='utf-8') as fp:
-        json.dump(bVideoPushInfo,fp,ensure_ascii=False)
+        await addBUp.send('收录{}执行成功'.format(name))
+    writeFile(bVideoPushInfoPath,bVideoPushInfo)
     
-
 
 sendB = on_command("推送b站",aliases={'推送B站'})
 @sendB.handle()
-async def _(bot: Bot, event: MessageEvent):
-    op=0
-    await sendBVideo(op,bot,event)
+async def _(bot: Bot, event: MessageEvent,args: Message = CommandArg()):
+    print(str(args))
+    if args.extract_plain_text()=='':
+        op=0
+        await sendBVideo(op,bot,event)
+    else:
+        message=await getUpSendMsg(args.extract_plain_text())
+        await bot.send(
+            event=event,
+            message=message
+        )
+
+
+delSelfBPush = on_command("删除自己全部B站推送",block=True)
+@delSelfBPush.handle()
+async def _(bot: Bot, event: MessageEvent,args: Message = CommandArg()):
+    ''''删除群聊自己的全部或私聊的全部'''
+    text=event.get_plaintext().strip()
+    argsText=args.extract_plain_text().strip()
+    comText=getExist("",text,argsText)
+    if isinstance(event,PrivateMessageEvent):
+        id=event.get_user_id()
+        pushType='qq'   
+    if isinstance(event,GroupMessageEvent):
+        id=str(event.group_id)
+        pushType='group'
+    uid=event.user_id
+    # if '定时' in argsText:
+    sendInfo=schedulerInfo[pushType].get(id)
+    if sendInfo!=None:
+        if pushType=='qq' or sendInfo=={}:
+            del schedulerInfo[pushType][id]
+        else:
+            titleList=list(sendInfo.keys())
+            for title in titleList:
+                if sendInfo[title]['id']==uid:
+                    del sendInfo[title]
+        writeFile(schedulerInfoPath,schedulerInfo)
+    else:
+        resMsg='无需删除'
+        await delSelfBPush.finish(resMsg)
+    if pushType=='qq':
+        resMsg='已全部{}成功，结果如下\n{}'.format(comText,sendInfo)
+    else:
+        resMsg='已全部{}成功'.format(comText)
+    # else:#数据结构暂不支持
+    #     sendDict=bVideoPushInfo["sendDict"]
+    #     for sendMid in sendDict.keys():
+    #         sendList=sendDict[sendMid][pushType]
+    #         if uid in sendList:
+    #             sendList.remove(uid)
+    #         else:
+    #             continue
+    #     writeFile(bVideoPushInfoPath,bVideoPushInfo)
+    #     resMsg='已删除{}'.format(uid)
+    await delSelfBPush.send(resMsg)
+
+delGroupBPush = on_command("删除群聊全部B站推送",block=True,permission=GROUP_ADMIN|GROUP_OWNER|SUPERUSER)
+@delGroupBPush.handle()
+async def _(bot: Bot, event: GroupMessageEvent,args: Message = CommandArg()):
+    '''删除群聊全部或群内指定uid全部定时推送'''
+    text=event.get_plaintext().strip()
+    argsText=args.extract_plain_text().strip()
+    comText=getExist("",text,argsText)
+    id=event.group_id
+    pushType='group'
+    if '定时' in argsText:
+        uid=argsText.replace('定时','').strip()
+        sendInfo=schedulerInfo[pushType].get(id)
+        if sendInfo!=None:
+            if uid.isdigit() and len(uid)>5 and sendInfo!={}:
+                uid=int(uid)
+                titleList=list(sendInfo.keys())
+                for title in titleList:
+                    if sendInfo[title]['id']==uid:
+                        del sendInfo[title]
+                if sendInfo=={}:
+                    del schedulerInfo[pushType][id]
+            else:
+                del schedulerInfo[pushType][id]
+            writeFile(schedulerInfoPath,schedulerInfo)
+            resMsg='已全部{}成功'.format(comText)
+        else:
+            resMsg='无需删除'
+    else:
+        sendDict=bVideoPushInfo["sendDict"]
+        for sendMid in sendDict.keys():
+            sendList=sendDict[sendMid][pushType]
+            if id in sendList:
+                sendList.remove(id)
+            else:
+                continue
+        writeFile(bVideoPushInfoPath,bVideoPushInfo)
+        resMsg='已删除群聊内{}添加的推送'.format(id)
+    await delGroupBPush.send(resMsg)
+
 
 addBPush = on_command("添加B站推送",aliases={'删除B站推送'})
 @addBPush.handle()
-async def _(bot: Bot, event: MessageEvent):
-    with open(bVideo_dir +'/bVideoPushInfo.json','r',encoding='utf-8') as fp:
-        bVideoPushInfo=json.loads(fp.read())
+async def _(bot: Bot, event: MessageEvent,args: Message = CommandArg()):
     text=event.get_plaintext().strip()
-    op=text[1:3]
-    text=text[7:].strip()
-    if text=='':
+    argsText=args.extract_plain_text().strip()
+    comText=getExist("",text,argsText)
+    if argsText=='':
         await addBPush.finish('请在命令后面加上up名字')
+    argsText=argsText.split()
+    if len(argsText)>=2:
+        upName,time=argsText
+    else:
+        upName=argsText[0]
+        time=''
     videoUp=bVideoPushInfo["videoUp"]
-    mid=''
-    for up in videoUp:
-        if text in up:
-            mid=videoUp[up]
+    mid=findMid(upName,videoUp)
     if mid=='':
         await addBPush.finish('推送目录暂无此up，请先添加，命令/添加B站UP 名字')
-    sendDict=bVideoPushInfo["sendDict"]
-    if isinstance(event,PrivateMessageEvent):
-        id=event.user_id
-        sendList=sendDict[mid]['qq']
-        # name=sendDict[mid]['videoUp']
-    if isinstance(event,GroupMessageEvent):
-        id=event.group_id
-        sendList=sendDict[mid]['group']
-    if id not in sendList:
-        if op=='添加':
-            sendList.append(id)
+    isAdd='添加' in comText
+    if time!='' or not isAdd:
+        await register(bot,event,upName,time,mid,isAdd)
     else:
-        if op=='删除':
+        sendDict=bVideoPushInfo["sendDict"]
+        if isinstance(event,PrivateMessageEvent):
+            id=event.user_id
+            sendList=sendDict[mid]['qq']
+            # name=sendDict[mid]['videoUp']
+        if isinstance(event,GroupMessageEvent):
+            id=event.group_id
+            sendList=sendDict[mid]['group']
+        if id not in sendList and isAdd:
+            sendList.append(id)
+        elif id in sendList and not isAdd:
             sendList.remove(id)
-    with open(bVideo_dir +'/bVideoPushInfo.json','w',encoding='utf-8') as fp:
-        json.dump(bVideoPushInfo,fp,ensure_ascii=False)
-    await addBPush.send('{}已{}成功'.format(sendDict[mid]['videoUp'],op))
+        else:
+            await addBPush.finish('重复操作')
+
+            
+        writeFile(bVideoPushInfoPath,bVideoPushInfo)
+        await addBPush.send('{}已{}成功，请确认是否正确，不正确请删除并输入完整up名'.format(sendDict[mid]['videoUp'],comText))
+
+
+
+    # argsText=argsText.replace('定时','').strip()
+    # if '定时' in argsText:
+    #     if schedulerInfo.get(argsText)!=None:
+    #         id=argsText
+    #     if pushType!='group':
+    #         schedulerInfo[id]={}
+    #     else:
+    #         for userSendInfos in schedulerInfo.values():
+    #             for userSendInfoTitle in userSendInfos.keys():
+    #                 userSendInfo=userSendInfos[userSendInfoTitle]
+    #                 if userSendInfo['id']==id:
+    #                     userSendInfos.remove(userSendInfoTitle)
+    #     writeFile(schedulerInfoPath,schedulerInfo)
+    #     resMsg=await parseMsg(comText,'已全部{}成功，如：\n{}'.format(comText,str(schedulerInfo[id])))
+    # else:
+    #     sendDict=bVideoPushInfo["sendDict"]
+    #     for sendMid in sendDict.keys():
+    #         sendList=sendDict[sendMid][pushType]
+    #         if id in sendList:
+    #             sendList.remove(id)
+    #         else:
+    #             continue
+    #     resMsg='已删除{}'.format(id)
+    #     writeFile(bVideoPushInfoPath,bVideoPushInfo)
         
-async def sendBVideo(op=0,bot: Bot='', event: MessageEvent=''):
-    with open(bVideo_dir +'/bVideoPushInfo.json','r',encoding='utf-8') as fp:
-        bVideoPushInfo=json.loads(fp.read())
-    baseUrl='https://api.bilibili.com/x/space/arc/search?mid='  
-    i=0
-    maxCount=bVideoPushInfo["maxCount"]
-    for mid in bVideoPushInfo["sendDict"].keys():
-        if i>=maxCount:
-            break
-        message=requests.get(baseUrl+mid,headers=headers).json()
-        message=message["data"]["list"][ "vlist"][0]
-        message='标题:{}\n链接:\nhttps://www.bilibili.com/video/{}'.format(message["title"],message["bvid"])
-        print(message)
-        if op==0:
-            await bot.send(
-                event=event,
-                message=message
-            )
-        else: 
-            if oldMessage.get(mid)==None:
-                oldMessage[mid]=''
-            print(oldMessage[mid], message!=oldMessage[mid])
-            if message!=oldMessage[mid]:
-                oldMessage[mid]=message
-                sendDict=bVideoPushInfo["sendDict"][mid]
-                for qq in sendDict['qq']:    
-                    await get_bot().send_private_msg(user_id=qq, message=message)
-                for group in sendDict['group']:    
-                    await get_bot().send_group_msg(group_id=group, message=message)
-        i+=1
-                
-    if op!=0:
-        with open(bVideo_dir +'/oldMessage.json','w',encoding='utf-8') as fp:
-            json.dump(oldMessage,fp,ensure_ascii=False)
+    # await addBPush.send(resMsg)
