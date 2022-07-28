@@ -81,19 +81,20 @@ async def _(bot: Bot, event: MessageEvent,args: Message = CommandArg()):
     # if '定时' in argsText:
     sendInfo=schedulerInfo[pushType].get(id)
     if sendInfo!=None:
-        if pushType=='qq' or sendInfo=={}:
+        isPrivate=(pushType=='qq')
+        titleList=list(sendInfo.keys())
+        for title in titleList:
+            if isPrivate or sendInfo[title]['id']==uid:
+                scheduler.remove_job(sendInfo[title]['jobId'])
+                del sendInfo[title]
+        if sendInfo=={}:
             del schedulerInfo[pushType][id]
-        else:
-            titleList=list(sendInfo.keys())
-            for title in titleList:
-                if sendInfo[title]['id']==uid:
-                    del sendInfo[title]
         writeFile(schedulerInfoPath,schedulerInfo)
     else:
         resMsg='无需删除'
         await delSelfBPush.finish(resMsg)
     if pushType=='qq':
-        resMsg='已全部{}成功，结果如下\n{}'.format(comText,sendInfo)
+        resMsg='已全部{}成功'.format(comText)
     else:
         resMsg='已全部{}成功'.format(comText)
     # else:#数据结构暂不支持
@@ -122,15 +123,15 @@ async def _(bot: Bot, event: GroupMessageEvent,args: Message = CommandArg()):
         uid=argsText.replace('定时','').strip()
         sendInfo=schedulerInfo[pushType].get(id)
         if sendInfo!=None:
-            if uid.isdigit() and len(uid)>5 and sendInfo!={}:
+            isAll=not (uid.isdigit() and len(uid)>5)
+            if not isAll:
                 uid=int(uid)
-                titleList=list(sendInfo.keys())
-                for title in titleList:
-                    if sendInfo[title]['id']==uid:
-                        del sendInfo[title]
-                if sendInfo=={}:
-                    del schedulerInfo[pushType][id]
-            else:
+            titleList=list(sendInfo.keys())
+            for title in titleList:
+                if isAll or sendInfo[title]['id']==uid:
+                    scheduler.remove_job(sendInfo[title]['jobId'])
+                    del sendInfo[title]
+            if sendInfo=={}:
                 del schedulerInfo[pushType][id]
             writeFile(schedulerInfoPath,schedulerInfo)
             resMsg='已全部{}成功'.format(comText)

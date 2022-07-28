@@ -187,7 +187,7 @@ async def register(bot: Bot, event: MessageEvent,title,time,content,isRegister,i
         schedulerTypedInfo[id][title]=tempInfo
         scheduler.add_job(sendSingle, "cron", hour=time[0], minute=time[1],args=[tempInfo['content'],id,tempInfo['type']],id=tempInfo['jobId'])
         writeFile(schedulerInfoPath,schedulerInfo)
-        await bot.send(event=event,message='已注册\n{}:\n{},请确认up名{}否正确，不正确请删除并输入完整up名'.format(title,tempInfo,bVideoPushInfo['sendDict'][content]["videoUp"]))
+        await bot.send(event=event,message='已注册\n{}:\n{},请确认实际up名({})否正确，不正确请删除并输入完整up名'.format(title,tempInfo,bVideoPushInfo['sendDict'][content]["videoUp"]))
     else:
         if schedulerTypedInfo.get(id)==None or schedulerTypedInfo[id].get(title)==None:
             await bot.send(event=event,message='{}不存在哦'.format(title))
